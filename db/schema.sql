@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS contact_lists (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
+  file_url VARCHAR(255),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -86,6 +87,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   contact_list_id UUID REFERENCES contact_lists(id) ON DELETE SET NULL,
   media_id VARCHAR(255),
   media_type VARCHAR(50),
+  media_url VARCHAR(255),
   total_sent INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -100,6 +102,7 @@ CREATE TABLE IF NOT EXISTS messages (
   contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
   direction message_direction NOT NULL,
   message_body TEXT,
+  media_url VARCHAR(255),
   meta_message_id VARCHAR(255),
   status message_status DEFAULT 'sent',
   timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -109,3 +112,16 @@ CREATE INDEX IF NOT EXISTS idx_messages_contact ON messages(contact_id);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_messages_campaign ON messages(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_messages_direction ON messages(contact_id, direction, timestamp);
+
+-- ============================================
+-- Media Assets (Media Library)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS media_assets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  original_name VARCHAR(255) NOT NULL,
+  media_url VARCHAR(255) NOT NULL,
+  meta_media_id VARCHAR(255),
+  resource_type VARCHAR(50) DEFAULT 'image',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

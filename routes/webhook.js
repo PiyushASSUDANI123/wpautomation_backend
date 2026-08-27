@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const { downloadMediaFromMeta } = require("../services/metaApi");
+const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
 
 // ============================================
 // GET /webhook — Meta Verification
@@ -50,22 +52,48 @@ router.post("/", async (req, res) => {
 
         // Extract message body based on type
         let messageBody = "";
+        let mediaUrl = null;
+        let mediaIdToDownload = null;
+        let resourceType = "auto";
+
         if (message.type === "text" && message.text) {
           messageBody = message.text.body;
         } else if (message.type === "image") {
           messageBody = "[Image]";
+          mediaIdToDownload = message.image.id;
+          resourceType = "image";
         } else if (message.type === "video") {
           messageBody = "[Video]";
+          mediaIdToDownload = message.video.id;
+          resourceType = "video";
         } else if (message.type === "audio") {
           messageBody = "[Audio]";
+          mediaIdToDownload = message.audio.id;
+          resourceType = "video";
         } else if (message.type === "document") {
           messageBody = "[Document]";
+          mediaIdToDownload = message.document.id;
+          resourceType = "raw";
         } else if (message.type === "location") {
           messageBody = "[Location]";
         } else if (message.type === "sticker") {
           messageBody = "[Sticker]";
+          mediaIdToDownload = message.sticker.id;
+          resourceType = "image";
         } else {
           messageBody = `[${message.type || "Unknown"}]`;
+        }
+
+        // Process media if present
+        if (mediaIdToDownload) {
+          try {
+            const mediaData = await downloadMediaFromMeta(mediaIdToDownload);
+            if (mediaData && mediaData.buffer) {
+              mediaUrl = await uploadBufferToCloudinary(mediaData.buffer, "wp_automation/inbound", resourceType);
+            }
+          } catch (mediaErr) {
+            console.error("❌ Failed to process inbound media:", mediaErr);
+          }
         }
 
         // Get contact name from contacts array if available
@@ -90,10 +118,10 @@ router.post("/", async (req, res) => {
 
         // Insert inbound message
         const msgResult = await db.query(
-          `INSERT INTO messages (contact_id, direction, message_body, meta_message_id, status, timestamp)
-           VALUES ($1, 'inbound', $2, $3, 'delivered', to_timestamp($4))
+          `INSERT INTO messages (contact_id, direction, message_body, media_url, meta_message_id, status, timestamp)
+           VALUES ($1, 'inbound', $2, $3, $4, 'delivered', to_timestamp($5))
            RETURNING *`,
-          [contact.id, messageBody, wamid, timestamp]
+          [contact.id, messageBody, mediaUrl, wamid, timestamp]
         );
 
         const savedMessage = msgResult.rows[0];
@@ -108,6 +136,7 @@ router.post("/", async (req, res) => {
             contact_name: contact.name,
             direction: "inbound",
             message_body: messageBody,
+            media_url: mediaUrl,
             meta_message_id: wamid,
             status: "delivered",
             timestamp: savedMessage.timestamp,

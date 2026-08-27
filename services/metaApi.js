@@ -127,6 +127,48 @@ const uploadMediaToMeta = async (filePath, mimeType) => {
   }
 };
 
+/**
+ * Download media from Meta WhatsApp Cloud API
+ * @param {string} mediaId - The Meta media ID
+ * @returns {Promise<{buffer: Buffer, mimeType: string}|null>}
+ */
+const downloadMediaFromMeta = async (mediaId) => {
+  try {
+    // 1. Get media URL
+    const urlResponse = await axios.get(
+      `${META_API_BASE}/${mediaId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+        },
+      }
+    );
+
+    const mediaUrl = urlResponse.data.url;
+    const mimeType = urlResponse.data.mime_type;
+
+    if (!mediaUrl) {
+      throw new Error("No media URL returned");
+    }
+
+    // 2. Download media binary
+    const mediaResponse = await axios.get(mediaUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+      },
+    });
+
+    return {
+      buffer: Buffer.from(mediaResponse.data, "binary"),
+      mimeType,
+    };
+  } catch (err) {
+    console.error("❌ Meta API download media error:", err.response?.data || err.message);
+    return null;
+  }
+};
+
 const WABA_ID = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 
 /**
@@ -156,4 +198,4 @@ const getTemplates = async () => {
   }
 };
 
-module.exports = { sendTemplateMessage, sendTextMessage, uploadMediaToMeta, getTemplates };
+module.exports = { sendTemplateMessage, sendTextMessage, uploadMediaToMeta, downloadMediaFromMeta, getTemplates };

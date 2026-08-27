@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const XLSX = require("xlsx");
 const db = require("../db");
+const { uploadExcelToSupabase } = require("../services/supabaseService");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -42,6 +43,15 @@ router.post("/", upload.single("file"), async (req, res) => {
     // Parse the uploaded file
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
+    
+    // Upload Excel file to Supabase Storage
+    let fileUrl = null;
+    try {
+      const filename = `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      fileUrl = await uploadExcelToSupabase(req.file.buffer, filename);
+    } catch (uploadErr) {
+      console.error("Failed to upload Excel to Supabase, continuing without URL:", uploadErr);
+    }
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
@@ -64,8 +74,8 @@ router.post("/", upload.single("file"), async (req, res) => {
 
     // 1. Create the list
     const listResult = await db.query(
-      `INSERT INTO contact_lists (name) VALUES ($1) RETURNING *`,
-      [name]
+      `INSERT INTO contact_lists (name, file_url) VALUES ($1, $2) RETURNING *`,
+      [name, fileUrl]
     );
     const list = listResult.rows[0];
 

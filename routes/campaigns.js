@@ -5,6 +5,7 @@ const XLSX = require("xlsx");
 const { v4: uuidv4 } = require("uuid");
 const db = require("../db");
 const { processCampaign } = require("../services/campaignProcessor");
+const { uploadFileToCloudinary } = require("../services/cloudinaryService");
 
 // Configure multer for file uploads (in memory)
 const upload = multer({
@@ -52,6 +53,7 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
     // Handle optional media upload
     let media_id = null;
     let media_type = null;
+    let media_url = null;
 
     if (req.file) {
       if (req.file.mimetype.startsWith("image/")) {
@@ -66,6 +68,16 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
       media_id = await uploadMediaToMeta(req.file.path, req.file.mimetype);
       if (!media_id) {
         return res.status(500).json({ error: "Failed to upload media to WhatsApp Meta API." });
+      }
+
+      // Upload to Cloudinary
+      try {
+        let resourceType = "auto";
+        if (media_type === "image") resourceType = "image";
+        if (media_type === "video") resourceType = "video";
+        media_url = await uploadFileToCloudinary(req.file.path, "wp_automation/campaigns", resourceType);
+      } catch (uploadErr) {
+        console.error("Cloudinary upload failed, proceeding without URL:", uploadErr);
       }
     }
 
@@ -84,10 +96,10 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
 
     // Create campaign record
     const campaignResult = await db.query(
-      `INSERT INTO campaigns (name, template_name, contact_list_id, media_id, media_type, total_sent)
-       VALUES ($1, $2, $3, $4, $5, 0)
+      `INSERT INTO campaigns (name, template_name, contact_list_id, media_id, media_type, media_url, total_sent)
+       VALUES ($1, $2, $3, $4, $5, $6, 0)
        RETURNING *`,
-      [name, template_name, contact_list_id, media_id, media_type]
+      [name, template_name, contact_list_id, media_id, media_type, media_url]
     );
     const campaign = campaignResult.rows[0];
 

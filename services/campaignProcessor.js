@@ -22,7 +22,11 @@ let campaignQueue = null;
 let campaignWorker = null;
 
 const initBullMQ = (io) => {
-  if (!bullmqAvailable) return false;
+  if (!bullmqAvailable || process.env.USE_REDIS !== "true") {
+    console.log("ℹ️ BullMQ/Redis disabled (set USE_REDIS=true to enable). Using in-memory queue fallback.");
+    bullmqAvailable = false;
+    return false;
+  }
 
   try {
     const IORedis = require("ioredis");

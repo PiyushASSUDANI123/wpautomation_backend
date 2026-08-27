@@ -57,6 +57,7 @@ const webhookRoutes = require("./routes/webhook");
 const authRoutes = require("./routes/auth");
 const contactListsRoutes = require("./routes/contact_lists");
 const templateRoutes = require("./routes/templates");
+const mediaRoutes = require("./routes/media");
 
 app.use("/api", apiRoutes);
 app.use("/api/auth", authRoutes);
@@ -65,6 +66,7 @@ app.use("/api/contacts", contactRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/templates", templateRoutes);
+app.use("/api/media", mediaRoutes);
 app.use("/webhook", webhookRoutes);
 
 // Health check route
