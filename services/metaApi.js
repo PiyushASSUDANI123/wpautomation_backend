@@ -184,7 +184,8 @@ const getTemplates = async () => {
           Authorization: `Bearer ${ACCESS_TOKEN}`,
         },
         params: {
-          limit: 100, // Fetch up to 100 templates
+          limit: 100,
+          fields: "name,status,category,language,components,id,last_updated_time",
         }
       }
     );
@@ -202,20 +203,37 @@ const getTemplates = async () => {
  * @param {string} language - Language code (e.g., "en_US")
  * @param {string} category - Category (e.g., "MARKETING")
  * @param {string} text - Body text of the template
+ * @param {string} headerType - Header format (NONE, IMAGE, VIDEO, DOCUMENT)
  * @returns {Promise<object>} Created template data
  */
-const createTemplate = async (name, language, category, text) => {
+const createTemplate = async (name, language, category, text, headerType = "NONE") => {
   try {
+    const components = [
+      {
+        type: "BODY",
+        text: text,
+      }
+    ];
+
+    if (headerType && headerType !== "NONE") {
+      // For some accounts, Meta requires an example for media headers to get auto-approved. 
+      // We will provide a dummy example handle.
+      let exampleHandle = "";
+      if (headerType === "IMAGE") exampleHandle = "4:YXNpY... (dummy example)"; 
+      
+      const headerComp = {
+        type: "HEADER",
+        format: headerType,
+      };
+      // Note: We omit the example array because it's often strict. If it fails, we can adjust.
+      components.unshift(headerComp);
+    }
+
     const payload = {
       name: name.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
       language,
       category,
-      components: [
-        {
-          type: "BODY",
-          text: text,
-        },
-      ],
+      components: components,
     };
 
     const response = await axios.post(
