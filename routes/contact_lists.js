@@ -55,22 +55,38 @@ router.post("/", upload.single("file"), async (req, res) => {
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    const phoneNumbers = [];
-    for (let i = 0; i < rows.length; i++) {
+    const contactsToSave = [];
+    // Start from i=1 to skip the header row (S.No, Name, Mobile Number, City)
+    for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      if (row && row[0]) {
-        let phone = String(row[0]).trim().replace(/[^0-9]/g, "");
+      if (row && row.length >= 3) {
+        let name = String(row[1] || "").trim(); // Column B: Name
+        let phone = String(row[2] || "").trim().replace(/[^0-9]/g, ""); // Column C: Mobile
+        let city = String(row[3] || "").trim(); // Column D: City
+        
+        // Prepend 91 to 10 digit Indian numbers
+        if (phone.length === 10) {
+          phone = "91" + phone;
+        }
+
         if (phone.length >= 10) {
-          phoneNumbers.push(phone);
+          contactsToSave.push({ name, phone, city });
         }
       }
     }
 
-    if (phoneNumbers.length === 0) {
-      return res.status(400).json({ error: "No valid phone numbers found in the file" });
+    if (contactsToSave.length === 0) {
+      return res.status(400).json({ error: "No valid phone numbers found. Please ensure S.No, Name, Mobile Number, City format." });
     }
 
-    const uniquePhones = [...new Set(phoneNumbers)];
+    // Deduplicate by phone
+    const uniqueMap = new Map();
+    for (const c of contactsToSave) {
+      if (!uniqueMap.has(c.phone)) {
+        uniqueMap.set(c.phone, c);
+      }
+    }
+    const uniqueContacts = Array.from(uniqueMap.values());
 
     // 1. Create the list
     const listResult = await db.query(
@@ -81,13 +97,15 @@ router.post("/", upload.single("file"), async (req, res) => {
 
     // 2. Upsert contacts and add to list members
     let addedCount = 0;
-    for (const phone of uniquePhones) {
+    for (const contact of uniqueContacts) {
       const contactResult = await db.query(
-        `INSERT INTO contacts (phone_number)
-         VALUES ($1)
-         ON CONFLICT (phone_number) DO UPDATE SET phone_number = $1
+        `INSERT INTO contacts (phone_number, name, city)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (phone_number) DO UPDATE SET 
+           name = COALESCE(NULLIF(EXCLUDED.name, ''), contacts.name),
+           city = COALESCE(NULLIF(EXCLUDED.city, ''), contacts.city)
          RETURNING id`,
-        [phone]
+        [contact.phone, contact.name, contact.city]
       );
       
       const contactId = contactResult.rows[0].id;
