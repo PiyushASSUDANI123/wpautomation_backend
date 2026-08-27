@@ -189,9 +189,8 @@ const getTemplates = async () => {
       }
     );
 
-    // Only return approved templates
-    const approvedTemplates = response.data.data.filter(t => t.status === 'APPROVED');
-    return approvedTemplates;
+    // Return all templates so user can see Pending status
+    return response.data.data || [];
   } catch (err) {
     console.error("❌ Meta API getTemplates error:", err.response?.data || err.message);
     throw new Error(err.response?.data?.error?.message || err.message);
