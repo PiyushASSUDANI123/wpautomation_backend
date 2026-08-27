@@ -16,5 +16,23 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: err.message || "Failed to fetch templates" });
   }
 });
+// ============================================
+// POST /api/templates — Create a new Meta template
+// ============================================
+router.post("/", async (req, res) => {
+  try {
+    const { name, language, category, text } = req.body;
+    
+    if (!name || !language || !category || !text) {
+      return res.status(400).json({ error: "Missing required fields: name, language, category, text" });
+    }
+
+    const result = await require("../services/metaApi").createTemplate(name, language, category, text);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error("❌ Create template error:", err);
+    res.status(500).json({ error: err.message || "Failed to create template" });
+  }
+});
 
 module.exports = router;

@@ -197,5 +197,43 @@ const getTemplates = async () => {
     throw new Error(err.response?.data?.error?.message || err.message);
   }
 };
+/**
+ * Create a new message template in Meta
+ * @param {string} name - Template name
+ * @param {string} language - Language code (e.g., "en_US")
+ * @param {string} category - Category (e.g., "MARKETING")
+ * @param {string} text - Body text of the template
+ * @returns {Promise<object>} Created template data
+ */
+const createTemplate = async (name, language, category, text) => {
+  try {
+    const payload = {
+      name: name.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+      language,
+      category,
+      components: [
+        {
+          type: "BODY",
+          text: text,
+        },
+      ],
+    };
 
-module.exports = { sendTemplateMessage, sendTextMessage, uploadMediaToMeta, downloadMediaFromMeta, getTemplates };
+    const response = await axios.post(
+      `${META_API_BASE}/${WABA_ID}/message_templates`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return response.data;
+  } catch (err) {
+    console.error("❌ Meta API createTemplate error:", err.response?.data || err.message);
+    throw new Error(err.response?.data?.error?.user_msg || err.response?.data?.error?.message || err.message);
+  }
+};
+
+module.exports = { sendTemplateMessage, sendTextMessage, uploadMediaToMeta, downloadMediaFromMeta, getTemplates, createTemplate };
