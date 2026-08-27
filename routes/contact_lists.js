@@ -136,4 +136,23 @@ router.post("/", upload.single("file"), async (req, res) => {
   }
 });
 
+// GET /api/contact_lists/:id/contacts — Get all contacts for a specific list
+router.get("/:id/contacts", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(
+      `SELECT c.id, c.phone_number, c.name, c.city, c.created_at
+       FROM contact_list_members clm
+       JOIN contacts c ON clm.contact_id = c.id
+       WHERE clm.list_id = $1
+       ORDER BY c.created_at DESC`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("❌ List contacts error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

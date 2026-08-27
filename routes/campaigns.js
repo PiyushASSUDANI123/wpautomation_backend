@@ -44,10 +44,22 @@ const uploadMedia = multer({
 // ============================================
 router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
   try {
-    const { name, template_name, language_code, contact_list_id } = req.body;
+    const { name, template_name, language_code, contact_list_ids } = req.body;
 
-    if (!name || !template_name || !contact_list_id) {
-      return res.status(400).json({ error: "Campaign name, template_name, and contact_list_id are required" });
+    if (!name || !template_name || !contact_list_ids) {
+      return res.status(400).json({ error: "Campaign name, template_name, and contact_list_ids are required" });
+    }
+
+    let parsedListIds = [];
+    try {
+      parsedListIds = JSON.parse(contact_list_ids);
+    } catch (e) {
+      // Fallback in case it's a single string id somehow
+      parsedListIds = [contact_list_ids];
+    }
+
+    if (!Array.isArray(parsedListIds) || parsedListIds.length === 0) {
+      return res.status(400).json({ error: "No contact lists selected" });
     }
 
     // Handle optional media upload
@@ -81,25 +93,27 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
       }
     }
 
-    // Verify contact list exists and get members
+    // Verify contact lists exist and get unique members
     const membersResult = await db.query(
-      `SELECT c.id, c.phone_number
+      `SELECT DISTINCT c.id, c.phone_number
        FROM contact_list_members clm
        JOIN contacts c ON clm.contact_id = c.id
-       WHERE clm.list_id = $1`,
-      [contact_list_id]
+       WHERE clm.list_id = ANY($1::uuid[])`,
+      [parsedListIds]
     );
 
     if (membersResult.rows.length === 0) {
-      return res.status(400).json({ error: "Selected contact list is empty or does not exist" });
+      return res.status(400).json({ error: "Selected contact lists are empty or do not exist" });
     }
 
     // Create campaign record
+    // Store only the first list_id in the DB for backward compatibility if needed, 
+    // or just store the array if DB column is altered. For now, since column is UUID, store first one.
     const campaignResult = await db.query(
       `INSERT INTO campaigns (name, template_name, contact_list_id, media_id, media_type, media_url, total_sent)
        VALUES ($1, $2, $3, $4, $5, $6, 0)
        RETURNING *`,
-      [name, template_name, contact_list_id, media_id, media_type, media_url]
+      [name, template_name, parsedListIds[0], media_id, media_type, media_url]
     );
     const campaign = campaignResult.rows[0];
 
