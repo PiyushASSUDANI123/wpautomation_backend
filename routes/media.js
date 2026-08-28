@@ -13,10 +13,10 @@ const upload = multer({
       cb(null, `${Date.now()}-${file.originalname}`);
     },
   }),
-  limits: { fileSize: 16 * 1024 * 1024 }, // 16MB max
+  limits: { fileSize: 16 * 1024 * 1024 }, 
 });
 
-// GET /api/media — List all media assets
+
 router.get("/", async (req, res) => {
   try {
     const result = await db.query(
@@ -29,7 +29,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/media — Upload new media
+
 router.post("/", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -40,10 +40,10 @@ router.post("/", upload.single("file"), async (req, res) => {
     if (req.file.mimetype.startsWith("image/")) resourceType = "image";
     if (req.file.mimetype.startsWith("video/")) resourceType = "video";
 
-    // 1. Upload to Cloudinary
+    
     const mediaUrl = await uploadFileToCloudinary(req.file.path, "wp_automation/library", resourceType);
 
-    // 2. Upload to Meta API
+    
     let metaMediaId = null;
     try {
       metaMediaId = await uploadMediaToMeta(req.file.path, req.file.mimetype);
@@ -51,7 +51,7 @@ router.post("/", upload.single("file"), async (req, res) => {
       console.warn("⚠️ Meta upload failed, continuing with Cloudinary only:", metaErr.message);
     }
 
-    // 3. Save to DB
+    
     const result = await db.query(
       `INSERT INTO media_assets (original_name, media_url, meta_media_id, resource_type)
        VALUES ($1, $2, $3, $4) RETURNING *`,
@@ -65,7 +65,7 @@ router.post("/", upload.single("file"), async (req, res) => {
   }
 });
 
-// DELETE /api/media/:id
+
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;

@@ -9,13 +9,6 @@ if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
 }
 
-/**
- * Uploads a file buffer to Supabase Storage
- * @param {Buffer} buffer - The file buffer to upload
- * @param {string} filename - The desired filename in the bucket
- * @param {string} bucket - The Supabase storage bucket name
- * @returns {Promise<string|null>} The public URL of the uploaded file
- */
 const uploadExcelToSupabase = async (buffer, filename, bucket = "excel-sheets") => {
   if (!supabase) {
     console.warn("Supabase client not initialized. Check SUPABASE_URL and SUPABASE_KEY.");

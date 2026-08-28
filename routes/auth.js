@@ -6,8 +6,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "fallback_super_secret_key_for_gau_
 
 const db = require("../db");
 
-// Since it's an MVP, we are hardcoding a simple admin login.
-// In production, we would check the 'users' table and use bcrypt.
+
+
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -39,12 +39,12 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Update profile credentials
+
 router.put("/profile", async (req, res) => {
   const { currentUsername, currentPassword, newUsername, newPassword } = req.body;
 
   try {
-    // Verify current credentials
+    
     const checkResult = await db.query(
       "SELECT id FROM users WHERE username = $1 AND password = $2",
       [currentUsername, currentPassword]
@@ -56,7 +56,7 @@ router.put("/profile", async (req, res) => {
 
     const userId = checkResult.rows[0].id;
 
-    // Update with new credentials
+    
     await db.query(
       "UPDATE users SET username = $1, password = $2 WHERE id = $3",
       [newUsername, newPassword, userId]

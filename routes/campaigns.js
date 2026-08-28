@@ -7,10 +7,10 @@ const db = require("../db");
 const { processCampaign } = require("../services/campaignProcessor");
 const { uploadFileToCloudinary } = require("../services/cloudinaryService");
 
-// Configure multer for file uploads (in memory)
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 10 * 1024 * 1024 }, 
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -36,12 +36,12 @@ const uploadMedia = multer({
       cb(null, `${Date.now()}-${file.originalname}`);
     }
   }),
-  limits: { fileSize: 16 * 1024 * 1024 }, // 16MB limit for WhatsApp media
+  limits: { fileSize: 16 * 1024 * 1024 }, 
 });
 
-// ============================================
-// POST /api/campaigns — Create Campaign from Saved List
-// ============================================
+
+
+
 router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
   try {
     const { name, template_name, language_code, contact_list_ids } = req.body;
@@ -54,7 +54,7 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
     try {
       parsedListIds = JSON.parse(contact_list_ids);
     } catch (e) {
-      // Fallback in case it's a single string id somehow
+      
       parsedListIds = [contact_list_ids];
     }
 
@@ -62,7 +62,7 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
       return res.status(400).json({ error: "No contact lists selected" });
     }
 
-    // Handle optional media upload
+    
     let media_id = null;
     let media_type = null;
     let media_url = null;
@@ -76,13 +76,13 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
         media_type = "document";
       }
 
-      // Upload to Meta
+      
       media_id = await uploadMediaToMeta(req.file.path, req.file.mimetype);
       if (!media_id) {
         return res.status(500).json({ error: "Failed to upload media to WhatsApp Meta API." });
       }
 
-      // Upload to Cloudinary
+      
       try {
         let resourceType = "auto";
         if (media_type === "image") resourceType = "image";
@@ -93,7 +93,7 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
       }
     }
 
-    // Verify contact lists exist and get unique members
+    
     const membersResult = await db.query(
       `SELECT DISTINCT c.id, c.phone_number
        FROM contact_list_members clm
@@ -106,9 +106,9 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
       return res.status(400).json({ error: "Selected contact lists are empty or do not exist" });
     }
 
-    // Create campaign record
-    // Store only the first list_id in the DB for backward compatibility if needed, 
-    // or just store the array if DB column is altered. For now, since column is UUID, store first one.
+    
+    
+    
     const campaignResult = await db.query(
       `INSERT INTO campaigns (name, template_name, contact_list_id, media_id, media_type, media_url, total_sent)
        VALUES ($1, $2, $3, $4, $5, $6, 0)
@@ -117,13 +117,13 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
     );
     const campaign = campaignResult.rows[0];
 
-    // Prepare message list
+    
     const messages = membersResult.rows.map(member => ({
       to: member.phone_number,
       contactId: member.id,
     }));
 
-    // Process campaign (enqueue or in-memory)
+    
     const io = req.app.get("io");
     await processCampaign(
       messages, 
@@ -151,9 +151,9 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
   }
 });
 
-// ============================================
-// GET /api/campaigns — List All Campaigns
-// ============================================
+
+
+
 router.get("/", async (req, res) => {
   try {
     const result = await db.query(
@@ -175,9 +175,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ============================================
-// GET /api/campaigns/:id — Single Campaign Detail
-// ============================================
+
+
+
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -207,9 +207,9 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// ============================================
-// GET /api/campaigns/:id/recipients — Campaign Recipients
-// ============================================
+
+
+
 router.get("/:id/recipients", async (req, res) => {
   try {
     const { id } = req.params;

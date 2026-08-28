@@ -5,7 +5,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// Log connection events
+
 pool.on("connect", () => {
   console.log("📦 Connected to PostgreSQL");
 });
@@ -14,12 +14,6 @@ pool.on("error", (err) => {
   console.error("❌ PostgreSQL pool error:", err.message);
 });
 
-/**
- * Execute a query against the database
- * @param {string} text - SQL query text
- * @param {Array} params - Query parameters
- * @returns {Promise<import('pg').QueryResult>}
- */
 const query = async (text, params) => {
   const start = Date.now();
   const res = await pool.query(text, params);
@@ -30,10 +24,6 @@ const query = async (text, params) => {
   return res;
 };
 
-/**
- * Get a client from the pool for transactions
- * @returns {Promise<import('pg').PoolClient>}
- */
 const getClient = async () => {
   return await pool.connect();
 };

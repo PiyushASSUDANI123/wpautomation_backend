@@ -7,10 +7,10 @@ const { uploadExcelToSupabase } = require("../services/supabaseService");
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 10 * 1024 * 1024 }, 
 });
 
-// GET /api/contact_lists — List all saved sheets
+
 router.get("/", async (req, res) => {
   try {
     const result = await db.query(
@@ -27,7 +27,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/contact_lists — Upload Excel and save as a named list
+
 router.post("/", upload.single("file"), async (req, res) => {
   try {
     const { name } = req.body;
@@ -40,11 +40,11 @@ router.post("/", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Excel/CSV file is required" });
     }
 
-    // Parse the uploaded file
+    
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     
-    // Upload Excel file to Supabase Storage
+    
     let fileUrl = null;
     try {
       const filename = `${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
@@ -56,7 +56,7 @@ router.post("/", upload.single("file"), async (req, res) => {
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     const contactsToSave = [];
-    // Start from i=1 to skip the header row (S.No, Name, Mobile Number, City)
+    
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row && row.length >= 3) {
@@ -79,7 +79,7 @@ router.post("/", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "No valid phone numbers found. Please ensure S.No, Name, Mobile Number, City format." });
     }
 
-    // Deduplicate by phone
+    
     const uniqueMap = new Map();
     for (const c of contactsToSave) {
       if (!uniqueMap.has(c.phone)) {
@@ -88,14 +88,14 @@ router.post("/", upload.single("file"), async (req, res) => {
     }
     const uniqueContacts = Array.from(uniqueMap.values());
 
-    // 1. Create the list
+    
     const listResult = await db.query(
       `INSERT INTO contact_lists (name, file_url) VALUES ($1, $2) RETURNING *`,
       [name, fileUrl]
     );
     const list = listResult.rows[0];
 
-    // 2. Upsert contacts and add to list members
+    
     let addedCount = 0;
     for (const contact of uniqueContacts) {
       const contactResult = await db.query(
@@ -117,7 +117,7 @@ router.post("/", upload.single("file"), async (req, res) => {
         );
         addedCount++;
       } catch (e) {
-        // Ignore duplicate key errors for members
+        
       }
     }
 
@@ -136,7 +136,7 @@ router.post("/", upload.single("file"), async (req, res) => {
   }
 });
 
-// GET /api/contact_lists/:id/contacts — Get all contacts for a specific list
+
 router.get("/:id/contacts", async (req, res) => {
   try {
     const { id } = req.params;

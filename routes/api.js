@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-// GET /api/health
+
 router.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -10,7 +10,7 @@ router.get("/health", (req, res) => {
   });
 });
 
-// Example: GET /api/data
+
 router.get("/data", (req, res) => {
   res.json({
     message: "Sample data from backend",

@@ -2,9 +2,9 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// ============================================
-// GET /api/contacts — List Contacts with Last Message
-// ============================================
+
+
+
 router.get("/", async (req, res) => {
   try {
     const result = await db.query(
@@ -40,9 +40,9 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ============================================
-// GET /api/contacts/:id — Single Contact Detail
-// ============================================
+
+
+
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -52,7 +52,7 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "Contact not found" });
     }
 
-    // Get last inbound message timestamp for 24h window check
+    
     const lastInbound = await db.query(
       `SELECT timestamp FROM messages
        WHERE contact_id = $1 AND direction = 'inbound'

@@ -4,14 +4,6 @@ const META_API_BASE = `https://graph.facebook.com/${process.env.META_API_VERSION
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 
-/**
- * Send a template message via Meta Cloud API
- * @param {string} to - Recipient phone number (with country code, no +)
- * @param {string} templateName - Template name registered in Meta
- * @param {string} languageCode - Template language code (e.g., "en_US")
- * @param {Array} components - Template components (optional)
- * @returns {Promise<object>} Meta API response
- */
 const sendTemplateMessage = async (to, templateName, languageCode = "en_US", components = []) => {
   try {
     const payload = {
@@ -53,12 +45,6 @@ const sendTemplateMessage = async (to, templateName, languageCode = "en_US", com
   }
 };
 
-/**
- * Send a free-form text message (only within 24h window)
- * @param {string} to - Recipient phone number
- * @param {string} text - Message text
- * @returns {Promise<object>} Meta API response
- */
 const sendTextMessage = async (to, text) => {
   try {
     const payload = {
@@ -96,12 +82,6 @@ const sendTextMessage = async (to, text) => {
 const fs = require("fs");
 const FormData = require("form-data");
 
-/**
- * Upload a media file to Meta WhatsApp Cloud API
- * @param {string} filePath - Path to the local file
- * @param {string} mimeType - MIME type of the file
- * @returns {Promise<string|null>} Media ID or null if failed
- */
 const uploadMediaToMeta = async (filePath, mimeType) => {
   try {
     const formData = new FormData();
@@ -127,14 +107,9 @@ const uploadMediaToMeta = async (filePath, mimeType) => {
   }
 };
 
-/**
- * Download media from Meta WhatsApp Cloud API
- * @param {string} mediaId - The Meta media ID
- * @returns {Promise<{buffer: Buffer, mimeType: string}|null>}
- */
 const downloadMediaFromMeta = async (mediaId) => {
   try {
-    // 1. Get media URL
+    
     const urlResponse = await axios.get(
       `${META_API_BASE}/${mediaId}`,
       {
@@ -151,7 +126,7 @@ const downloadMediaFromMeta = async (mediaId) => {
       throw new Error("No media URL returned");
     }
 
-    // 2. Download media binary
+    
     const mediaResponse = await axios.get(mediaUrl, {
       responseType: "arraybuffer",
       headers: {
@@ -171,10 +146,6 @@ const downloadMediaFromMeta = async (mediaId) => {
 
 const WABA_ID = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 
-/**
- * Fetch approved templates from Meta WhatsApp Cloud API
- * @returns {Promise<Array>} List of templates
- */
 const getTemplates = async () => {
   try {
     const response = await axios.get(
@@ -190,23 +161,14 @@ const getTemplates = async () => {
       }
     );
 
-    // Return all templates so user can see Pending status
+    
     return response.data.data || [];
   } catch (err) {
     console.error("❌ Meta API getTemplates error:", err.response?.data || err.message);
     throw new Error(err.response?.data?.error?.message || err.message);
   }
 };
-/**
- * Create a new message template in Meta
- * @param {string} name - Template name
- * @param {string} language - Language code (e.g., "en_US")
- * @param {string} category - Category (e.g., "MARKETING")
- * @param {string} text - Body text of the template
- * @param {string} headerType - Header format (NONE, IMAGE, VIDEO, DOCUMENT)
- * @returns {Promise<object>} Created template data
- */
-const createTemplate = async (name, language, category, text, headerType = "NONE") => {
+const createTemplate = async (name, language, category, text, headerType = "NONE", buttons = []) => {
   try {
     const components = [
       {
@@ -216,8 +178,8 @@ const createTemplate = async (name, language, category, text, headerType = "NONE
     ];
 
     if (headerType && headerType !== "NONE") {
-      // For some accounts, Meta requires an example for media headers to get auto-approved. 
-      // We will provide a dummy example handle.
+      
+      
       let exampleHandle = "";
       if (headerType === "IMAGE") exampleHandle = "4:YXNpY... (dummy example)"; 
       
@@ -225,8 +187,25 @@ const createTemplate = async (name, language, category, text, headerType = "NONE
         type: "HEADER",
         format: headerType,
       };
-      // Note: We omit the example array because it's often strict. If it fails, we can adjust.
+      
       components.unshift(headerComp);
+    }
+
+    if (buttons && buttons.length > 0) {
+      const buttonComponent = {
+        type: "BUTTONS",
+        buttons: buttons.map(btn => {
+          if (btn.type === "QUICK_REPLY") {
+            return { type: "QUICK_REPLY", text: btn.text };
+          } else if (btn.type === "URL") {
+            return { type: "URL", text: btn.text, url: btn.url };
+          } else if (btn.type === "PHONE_NUMBER") {
+            return { type: "PHONE_NUMBER", text: btn.text, phone_number: btn.phone_number };
+          }
+          return null;
+        }).filter(Boolean),
+      };
+      components.push(buttonComponent);
     }
 
     const payload = {

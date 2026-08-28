@@ -3,9 +3,9 @@ const router = express.Router();
 const db = require("../db");
 const { sendTextMessage, sendTemplateMessage } = require("../services/metaApi");
 
-// ============================================
-// GET /api/messages/inbound — All Inbound Replies
-// ============================================
+
+
+
 router.get("/inbound", async (req, res) => {
   try {
     const result = await db.query(
@@ -23,21 +23,21 @@ router.get("/inbound", async (req, res) => {
   }
 });
 
-// ============================================
-// GET /api/messages/:contactId — Chat History
-// ============================================
+
+
+
 router.get("/:contactId", async (req, res) => {
   try {
     const { contactId } = req.params;
     const { limit = 100, offset = 0 } = req.query;
 
-    // Verify contact exists
+    
     const contactResult = await db.query(`SELECT * FROM contacts WHERE id = $1`, [contactId]);
     if (contactResult.rows.length === 0) {
       return res.status(404).json({ error: "Contact not found" });
     }
 
-    // Get messages
+    
     const messagesResult = await db.query(
       `SELECT * FROM messages
        WHERE contact_id = $1
@@ -46,7 +46,7 @@ router.get("/:contactId", async (req, res) => {
       [contactId, parseInt(limit), parseInt(offset)]
     );
 
-    // Get last inbound timestamp for 24h window
+    
     const lastInbound = await db.query(
       `SELECT timestamp FROM messages
        WHERE contact_id = $1 AND direction = 'inbound'
@@ -77,9 +77,9 @@ router.get("/:contactId", async (req, res) => {
   }
 });
 
-// ============================================
-// POST /api/messages/:contactId — Send Reply (24h window)
-// ============================================
+
+
+
 router.post("/:contactId", async (req, res) => {
   try {
     const { contactId } = req.params;
@@ -89,14 +89,14 @@ router.post("/:contactId", async (req, res) => {
       return res.status(400).json({ error: "Message text is required" });
     }
 
-    // Get contact
+    
     const contactResult = await db.query(`SELECT * FROM contacts WHERE id = $1`, [contactId]);
     if (contactResult.rows.length === 0) {
       return res.status(404).json({ error: "Contact not found" });
     }
     const contact = contactResult.rows[0];
 
-    // Check 24h window
+    
     const lastInbound = await db.query(
       `SELECT timestamp FROM messages
        WHERE contact_id = $1 AND direction = 'inbound'
@@ -124,7 +124,7 @@ router.post("/:contactId", async (req, res) => {
       });
     }
 
-    // Send via Meta API
+    
     const result = await sendTextMessage(contact.phone_number, message.trim());
 
     if (!result.success) {
@@ -134,7 +134,7 @@ router.post("/:contactId", async (req, res) => {
       });
     }
 
-    // Save to DB
+    
     const msgResult = await db.query(
       `INSERT INTO messages (contact_id, direction, message_body, meta_message_id, status, timestamp)
        VALUES ($1, 'outbound', $2, $3, 'sent', NOW())
@@ -144,7 +144,7 @@ router.post("/:contactId", async (req, res) => {
 
     const savedMessage = msgResult.rows[0];
 
-    // Emit via Socket.io
+    
     const io = req.app.get("io");
     if (io) {
       io.emit("new_message", {
@@ -167,9 +167,9 @@ router.post("/:contactId", async (req, res) => {
   }
 });
 
-// ============================================
-// POST /api/messages/:contactId/template — Send Template
-// ============================================
+
+
+
 router.post("/:contactId/template", async (req, res) => {
   try {
     const { contactId } = req.params;
@@ -179,14 +179,14 @@ router.post("/:contactId/template", async (req, res) => {
       return res.status(400).json({ error: "template_name is required" });
     }
 
-    // Get contact
+    
     const contactResult = await db.query(`SELECT * FROM contacts WHERE id = $1`, [contactId]);
     if (contactResult.rows.length === 0) {
       return res.status(404).json({ error: "Contact not found" });
     }
     const contact = contactResult.rows[0];
 
-    // Send template via Meta API
+    
     const result = await sendTemplateMessage(
       contact.phone_number,
       template_name,
@@ -201,7 +201,7 @@ router.post("/:contactId/template", async (req, res) => {
       });
     }
 
-    // Save to DB
+    
     const msgResult = await db.query(
       `INSERT INTO messages (contact_id, direction, message_body, meta_message_id, status, timestamp)
        VALUES ($1, 'outbound', $2, $3, 'sent', NOW())
@@ -211,7 +211,7 @@ router.post("/:contactId/template", async (req, res) => {
 
     const savedMessage = msgResult.rows[0];
 
-    // Emit via Socket.io
+    
     const io = req.app.get("io");
     if (io) {
       io.emit("new_message", {

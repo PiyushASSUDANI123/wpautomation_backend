@@ -4,9 +4,9 @@ const db = require("../db");
 const { downloadMediaFromMeta } = require("../services/metaApi");
 const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
 
-// ============================================
-// GET /webhook — Meta Verification
-// ============================================
+
+
+
 router.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -21,17 +21,17 @@ router.get("/", (req, res) => {
   return res.status(403).json({ error: "Verification failed" });
 });
 
-// ============================================
-// POST /webhook — Inbound Message Receiver
-// ============================================
+
+
+
 router.post("/", async (req, res) => {
-  // Always respond 200 immediately (Meta requirement)
+  
   res.status(200).json({ status: "received" });
 
   try {
     const body = req.body;
 
-    // Validate it's a WhatsApp message event
+    
     if (
       !body.object ||
       !body.entry ||
@@ -43,14 +43,14 @@ router.post("/", async (req, res) => {
 
     const value = body.entry[0].changes[0].value;
 
-    // Handle incoming messages
+    
     if (value.messages && value.messages.length > 0) {
       for (const message of value.messages) {
-        const from = message.from; // Phone number
-        const wamid = message.id; // Meta message ID
+        const from = message.from; 
+        const wamid = message.id; 
         const timestamp = message.timestamp;
 
-        // Extract message body based on type
+        
         let messageBody = "";
         let mediaUrl = null;
         let mediaIdToDownload = null;
@@ -84,7 +84,7 @@ router.post("/", async (req, res) => {
           messageBody = `[${message.type || "Unknown"}]`;
         }
 
-        // Process media if present
+        
         if (mediaIdToDownload) {
           try {
             const mediaData = await downloadMediaFromMeta(mediaIdToDownload);
@@ -96,7 +96,7 @@ router.post("/", async (req, res) => {
           }
         }
 
-        // Get contact name from contacts array if available
+        
         let contactName = null;
         if (value.contacts && value.contacts.length > 0) {
           const contactInfo = value.contacts.find((c) => c.wa_id === from);
@@ -105,7 +105,7 @@ router.post("/", async (req, res) => {
           }
         }
 
-        // Upsert contact
+        
         const contactResult = await db.query(
           `INSERT INTO contacts (phone_number, name)
            VALUES ($1, $2)
@@ -116,7 +116,7 @@ router.post("/", async (req, res) => {
         );
         const contact = contactResult.rows[0];
 
-        // Insert inbound message
+        
         const msgResult = await db.query(
           `INSERT INTO messages (contact_id, direction, message_body, media_url, meta_message_id, status, timestamp)
            VALUES ($1, 'inbound', $2, $3, $4, 'delivered', to_timestamp($5))
@@ -126,7 +126,7 @@ router.post("/", async (req, res) => {
 
         const savedMessage = msgResult.rows[0];
 
-        // Emit via Socket.io for real-time UI updates
+        
         const io = req.app.get("io");
         if (io) {
           io.emit("new_message", {
@@ -147,11 +147,11 @@ router.post("/", async (req, res) => {
       }
     }
 
-    // Handle status updates (sent, delivered, read)
+    
     if (value.statuses && value.statuses.length > 0) {
       for (const status of value.statuses) {
         const metaMessageId = status.id;
-        const newStatus = status.status; // sent, delivered, read, failed
+        const newStatus = status.status; 
 
         if (["sent", "delivered", "read", "failed"].includes(newStatus)) {
           await db.query(
@@ -159,7 +159,7 @@ router.post("/", async (req, res) => {
             [newStatus, metaMessageId]
           );
 
-          // Emit status update via Socket.io
+          
           const io = req.app.get("io");
           if (io) {
             io.emit("message_status", {
