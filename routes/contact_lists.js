@@ -191,4 +191,21 @@ router.post("/:id/contacts", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // First remove all members of this list
+    await db.query(`DELETE FROM contact_list_members WHERE list_id = $1`, [id]);
+    
+    // Then delete the list itself
+    await db.query(`DELETE FROM contact_lists WHERE id = $1`, [id]);
+    
+    res.json({ message: "Contact list deleted successfully" });
+  } catch (err) {
+    console.error("❌ Delete contact list error:", err);
+    res.status(500).json({ error: "Failed to delete list. It might be in use." });
+  }
+});
+
 module.exports = router;
