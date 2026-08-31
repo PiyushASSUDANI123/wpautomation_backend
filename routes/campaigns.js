@@ -135,6 +135,20 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
       media_type
     );
 
+    // Auto-delete older campaigns, keeping only the last 50
+    try {
+      await db.query(`
+        DELETE FROM campaigns 
+        WHERE id NOT IN (
+          SELECT id FROM campaigns 
+          ORDER BY created_at DESC 
+          LIMIT 50
+        )
+      `);
+    } catch (cleanupErr) {
+      console.error("Cleanup error (auto-delete older than 50 campaigns):", cleanupErr);
+    }
+
     res.status(201).json({
       message: "Campaign created and processing started",
       campaign: {
@@ -224,6 +238,25 @@ router.get("/:id/recipients", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("❌ Campaign recipients error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Safely delete related messages first to avoid foreign key constraints
+    await db.query("DELETE FROM messages WHERE campaign_id = $1", [id]);
+    
+    const result = await db.query("DELETE FROM campaigns WHERE id = $1 RETURNING *", [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+
+    res.json({ message: "Campaign deleted successfully" });
+  } catch (err) {
+    console.error("❌ Campaign deletion error:", err);
     res.status(500).json({ error: err.message });
   }
 });

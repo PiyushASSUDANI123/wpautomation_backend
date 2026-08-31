@@ -155,4 +155,40 @@ router.get("/:id/contacts", async (req, res) => {
   }
 });
 
+router.post("/:id/contacts", async (req, res) => {
+  try {
+    const { id: list_id } = req.params;
+    const { name, phone_number, city } = req.body;
+    
+    if (!phone_number) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    let cleanedPhone = phone_number.replace(/\D/g, "");
+    if (cleanedPhone.length === 10) {
+      cleanedPhone = "91" + cleanedPhone;
+    }
+    
+    const contactResult = await db.query(
+      `INSERT INTO contacts (phone_number, name, city)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (phone_number) DO UPDATE SET 
+         name = COALESCE(NULLIF(EXCLUDED.name, ''), contacts.name),
+         city = COALESCE(NULLIF(EXCLUDED.city, ''), contacts.city)
+       RETURNING id`,
+      [cleanedPhone, name || "Unknown", city || ""]
+    );
+    const contactId = contactResult.rows[0].id;
+    
+    await db.query(
+      `INSERT INTO contact_list_members (list_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [list_id, contactId]
+    );
+
+    res.status(201).json({ message: "Contact added to list successfully" });
+  } catch (err) {
+    console.error("❌ Add contact to list error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

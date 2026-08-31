@@ -74,4 +74,48 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.post("/", async (req, res) => {
+  try {
+    const { name, phone_number } = req.body;
+    if (!phone_number) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    const cleanedPhone = phone_number.replace(/\D/g, "");
+    
+    const checkResult = await db.query("SELECT id FROM contacts WHERE phone_number = $1", [cleanedPhone]);
+    if (checkResult.rows.length > 0) {
+      return res.status(400).json({ error: "Contact with this phone number already exists" });
+    }
+
+    const result = await db.query(
+      "INSERT INTO contacts (name, phone_number) VALUES ($1, $2) RETURNING *",
+      [name || "Unknown", cleanedPhone]
+    );
+
+    res.status(201).json({ message: "Contact added successfully", contact: result.rows[0] });
+  } catch (err) {
+    console.error("❌ Add contact error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await db.query("DELETE FROM contact_list_members WHERE contact_id = $1", [id]);
+    await db.query("DELETE FROM messages WHERE contact_id = $1", [id]);
+    const result = await db.query("DELETE FROM contacts WHERE id = $1 RETURNING *", [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+
+    res.json({ message: "Contact deleted successfully" });
+  } catch (err) {
+    console.error("❌ Contact deletion error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
