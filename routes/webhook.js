@@ -31,6 +31,13 @@ router.post("/", async (req, res) => {
   try {
     const body = req.body;
 
+    // Log the entire webhook payload for debugging
+    try {
+      await db.query('INSERT INTO webhook_logs (payload) VALUES ($1)', [JSON.stringify(body)]);
+    } catch (logErr) {
+      console.error("Failed to insert webhook log:", logErr);
+    }
+
     
     if (
       !body.object ||
