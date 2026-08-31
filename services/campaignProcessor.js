@@ -59,6 +59,13 @@ const initBullMQ = (io) => {
             ],
           });
         }
+        
+        if (job.data.bodyParams && job.data.bodyParams.length > 0) {
+          components.push({
+            type: "body",
+            parameters: job.data.bodyParams
+          });
+        }
 
         const result = await sendTemplateMessage(to, templateName, languageCode, components);
 
@@ -141,8 +148,16 @@ const processInMemory = async (messages, campaignId, templateName, languageCode,
   for (let i = 0; i < messages.length; i += BATCH_SIZE) {
     const batch = messages.slice(i, i + BATCH_SIZE);
 
-    const promises = batch.map(async ({ to, contactId }) => {
-      const result = await sendTemplateMessage(to, templateName, languageCode, components);
+    const promises = batch.map(async ({ to, contactId, bodyParams }) => {
+      let messageComponents = [...components];
+      if (bodyParams && bodyParams.length > 0) {
+        messageComponents.push({
+          type: "body",
+          parameters: bodyParams
+        });
+      }
+
+      const result = await sendTemplateMessage(to, templateName, languageCode, messageComponents);
 
       await db.query(
         `INSERT INTO messages (campaign_id, contact_id, direction, message_body, meta_message_id, status, timestamp)
@@ -201,6 +216,7 @@ const processCampaign = async (messages, campaignId, templateName, languageCode,
         campaignId,
         mediaId,
         mediaType,
+        bodyParams: msg.bodyParams,
       });
     }
   } else {

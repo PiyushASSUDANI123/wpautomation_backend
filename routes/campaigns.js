@@ -27,7 +27,7 @@ const upload = multer({
 
 const os = require("os");
 const path = require("path");
-const { uploadMediaToMeta } = require("../services/metaApi");
+const { uploadMediaToMeta, getTemplates } = require("../services/metaApi");
 
 const uploadMedia = multer({
   storage: multer.diskStorage({
@@ -95,7 +95,7 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
 
     
     const membersResult = await db.query(
-      `SELECT DISTINCT c.id, c.phone_number
+      `SELECT DISTINCT c.id, c.phone_number, c.name, c.city
        FROM contact_list_members clm
        JOIN contacts c ON clm.contact_id = c.id
        WHERE clm.list_id = ANY($1::uuid[])`,
@@ -117,11 +117,41 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
     );
     const campaign = campaignResult.rows[0];
 
+    // Determine how many parameters the template needs
+    let paramCount = 0;
+    try {
+      const templates = await getTemplates();
+      const tpl = templates.find(t => t.name === template_name);
+      if (tpl) {
+        const bodyComponent = tpl.components.find(c => c.type === 'BODY');
+        if (bodyComponent && bodyComponent.text) {
+          const matches = bodyComponent.text.match(/\\{\\{\\d+\\}\\}/g);
+          if (matches) paramCount = matches.length;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch templates to check params:", err.message);
+    }
+
     
-    const messages = membersResult.rows.map(member => ({
-      to: member.phone_number,
-      contactId: member.id,
-    }));
+    const messages = membersResult.rows.map(member => {
+      const bodyParams = [];
+      if (paramCount >= 1) {
+        bodyParams.push({ type: "text", text: member.name || "Customer" });
+      }
+      if (paramCount >= 2) {
+        bodyParams.push({ type: "text", text: member.city || "Special Offer" });
+      }
+      for (let i = 2; i < paramCount; i++) {
+        bodyParams.push({ type: "text", text: "Update" }); // Generic fallback for extra params
+      }
+
+      return {
+        to: member.phone_number,
+        contactId: member.id,
+        bodyParams
+      };
+    });
 
     
     const io = req.app.get("io");
