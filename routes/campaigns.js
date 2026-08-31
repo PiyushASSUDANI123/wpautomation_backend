@@ -125,7 +125,7 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
       if (tpl) {
         const bodyComponent = tpl.components.find(c => c.type === 'BODY');
         if (bodyComponent && bodyComponent.text) {
-          const matches = bodyComponent.text.match(/\\{\\{\\d+\\}\\}/g);
+          const matches = bodyComponent.text.match(/\{\{\d+\}\}/g);
           if (matches) paramCount = matches.length;
         }
       }
