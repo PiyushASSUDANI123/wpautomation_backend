@@ -4,13 +4,6 @@ const db = require("../db");
 const { downloadMediaFromMeta } = require("../services/metaApi");
 const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
 
-// Status hierarchy — higher number = more progressed
-const STATUS_PRIORITY = {
-  failed: 0,
-  sent: 1,
-  delivered: 2,
-  read: 3,
-};
 
 
 
@@ -30,8 +23,9 @@ router.get("/", (req, res) => {
 
 
 
+
 router.post("/", async (req, res) => {
-  // Always respond 200 immediately to Meta
+  
   res.status(200).json({ status: "received" });
 
   try {
@@ -44,187 +38,142 @@ router.post("/", async (req, res) => {
       console.error("Failed to insert webhook log:", logErr);
     }
 
-    if (!body.object || !body.entry) {
+    
+    if (
+      !body.object ||
+      !body.entry ||
+      !body.entry[0]?.changes ||
+      !body.entry[0]?.changes[0]?.value
+    ) {
       return;
     }
 
-    // Process ALL entries and ALL changes (not just the first one)
-    for (const entry of body.entry) {
-      if (!entry.changes) continue;
+    const value = body.entry[0].changes[0].value;
 
-      for (const change of entry.changes) {
-        const value = change.value;
-        if (!value) continue;
+    
+    if (value.messages && value.messages.length > 0) {
+      for (const message of value.messages) {
+        const from = message.from; 
+        const wamid = message.id; 
+        const timestamp = message.timestamp;
 
-        // ─── Handle incoming messages ───
-        if (value.messages && value.messages.length > 0) {
-          for (const message of value.messages) {
-            try {
-              const from = message.from;
-              const wamid = message.id;
-              const timestamp = message.timestamp;
+        
+        let messageBody = "";
+        let mediaUrl = null;
+        let mediaIdToDownload = null;
+        let resourceType = "auto";
 
-              let messageBody = "";
-              let mediaUrl = null;
-              let mediaIdToDownload = null;
-              let resourceType = "auto";
+        if (message.type === "text" && message.text) {
+          messageBody = message.text.body;
+        } else if (message.type === "image") {
+          messageBody = "[Image]";
+          mediaIdToDownload = message.image.id;
+          resourceType = "image";
+        } else if (message.type === "video") {
+          messageBody = "[Video]";
+          mediaIdToDownload = message.video.id;
+          resourceType = "video";
+        } else if (message.type === "audio") {
+          messageBody = "[Audio]";
+          mediaIdToDownload = message.audio.id;
+          resourceType = "video";
+        } else if (message.type === "document") {
+          messageBody = "[Document]";
+          mediaIdToDownload = message.document.id;
+          resourceType = "raw";
+        } else if (message.type === "location") {
+          messageBody = "[Location]";
+        } else if (message.type === "sticker") {
+          messageBody = "[Sticker]";
+          mediaIdToDownload = message.sticker.id;
+          resourceType = "image";
+        } else {
+          messageBody = `[${message.type || "Unknown"}]`;
+        }
 
-              if (message.type === "text" && message.text) {
-                messageBody = message.text.body;
-              } else if (message.type === "image") {
-                messageBody = "[Image]";
-                mediaIdToDownload = message.image.id;
-                resourceType = "image";
-              } else if (message.type === "video") {
-                messageBody = "[Video]";
-                mediaIdToDownload = message.video.id;
-                resourceType = "video";
-              } else if (message.type === "audio") {
-                messageBody = "[Audio]";
-                mediaIdToDownload = message.audio.id;
-                resourceType = "video";
-              } else if (message.type === "document") {
-                messageBody = "[Document]";
-                mediaIdToDownload = message.document.id;
-                resourceType = "raw";
-              } else if (message.type === "location") {
-                messageBody = "[Location]";
-              } else if (message.type === "sticker") {
-                messageBody = "[Sticker]";
-                mediaIdToDownload = message.sticker.id;
-                resourceType = "image";
-              } else if (message.type === "interactive") {
-                if (message.interactive.type === "button_reply") {
-                  messageBody = message.interactive.button_reply.title;
-                } else if (message.interactive.type === "list_reply") {
-                  messageBody = message.interactive.list_reply.title;
-                } else {
-                  messageBody = "[Interactive Response]";
-                }
-              } else {
-                messageBody = `[${message.type || "Unknown"}]`;
-              }
-
-              // Download & upload media if present
-              if (mediaIdToDownload) {
-                try {
-                  const mediaData = await downloadMediaFromMeta(mediaIdToDownload);
-                  if (mediaData && mediaData.buffer) {
-                    mediaUrl = await uploadBufferToCloudinary(mediaData.buffer, "wp_automation/inbound", resourceType);
-                  }
-                } catch (mediaErr) {
-                  console.error("❌ Failed to process inbound media:", mediaErr);
-                }
-              }
-
-              // Get contact name from webhook payload
-              let contactName = null;
-              if (value.contacts && value.contacts.length > 0) {
-                const contactInfo = value.contacts.find((c) => c.wa_id === from);
-                if (contactInfo && contactInfo.profile) {
-                  contactName = contactInfo.profile.name;
-                }
-              }
-
-              // Upsert contact
-              const contactResult = await db.query(
-                `INSERT INTO contacts (phone_number, name)
-                 VALUES ($1, $2)
-                 ON CONFLICT (phone_number)
-                 DO UPDATE SET name = COALESCE($2, contacts.name)
-                 RETURNING id, phone_number, name`,
-                [from, contactName]
-              );
-              const contact = contactResult.rows[0];
-
-              // Save the message
-              const msgResult = await db.query(
-                `INSERT INTO messages (contact_id, direction, message_body, media_url, meta_message_id, status, timestamp)
-                 VALUES ($1, 'inbound', $2, $3, $4, 'delivered', to_timestamp($5::numeric))
-                 RETURNING *`,
-                [contact.id, messageBody, mediaUrl, wamid, timestamp]
-              );
-
-              const savedMessage = msgResult.rows[0];
-
-              // Emit via Socket.IO
-              const io = req.app.get("io");
-              if (io) {
-                io.emit("new_message", {
-                  id: savedMessage.id,
-                  contact_id: contact.id,
-                  contact_phone: contact.phone_number,
-                  contact_name: contact.name,
-                  direction: "inbound",
-                  message_body: messageBody,
-                  media_url: mediaUrl,
-                  meta_message_id: wamid,
-                  status: "delivered",
-                  timestamp: savedMessage.timestamp,
-                });
-              }
-
-              console.log(`📥 Inbound message from ${from}: "${messageBody.substring(0, 50)}"`);
-            } catch (msgErr) {
-              console.error("❌ Error processing individual inbound message:", msgErr);
+        
+        if (mediaIdToDownload) {
+          try {
+            const mediaData = await downloadMediaFromMeta(mediaIdToDownload);
+            if (mediaData && mediaData.buffer) {
+              mediaUrl = await uploadBufferToCloudinary(mediaData.buffer, "wp_automation/inbound", resourceType);
             }
+          } catch (mediaErr) {
+            console.error("❌ Failed to process inbound media:", mediaErr);
           }
         }
 
-        // ─── Handle status updates (sent / delivered / read / failed) ───
-        if (value.statuses && value.statuses.length > 0) {
-          for (const status of value.statuses) {
-            try {
-              const metaMessageId = status.id;
-              const newStatus = status.status;
-              const recipientId = status.recipient_id;
+        
+        let contactName = null;
+        if (value.contacts && value.contacts.length > 0) {
+          const contactInfo = value.contacts.find((c) => c.wa_id === from);
+          if (contactInfo && contactInfo.profile) {
+            contactName = contactInfo.profile.name;
+          }
+        }
 
-              if (!["sent", "delivered", "read", "failed"].includes(newStatus)) {
-                console.log(`⚠️ Unknown status "${newStatus}" for ${metaMessageId}, skipping`);
-                continue;
-              }
+        
+        const contactResult = await db.query(
+          `INSERT INTO contacts (phone_number, name)
+           VALUES ($1, $2)
+           ON CONFLICT (phone_number)
+           DO UPDATE SET name = COALESCE($2, contacts.name)
+           RETURNING id, phone_number, name`,
+          [from, contactName]
+        );
+        const contact = contactResult.rows[0];
 
-              // Only upgrade status, never downgrade
-              // e.g., don't go from "read" back to "delivered"
-              const existing = await db.query(
-                `SELECT status FROM messages WHERE meta_message_id = $1`,
-                [metaMessageId]
-              );
+        
+        const msgResult = await db.query(
+          `INSERT INTO messages (contact_id, direction, message_body, media_url, meta_message_id, status, timestamp)
+           VALUES ($1, 'inbound', $2, $3, $4, 'delivered', to_timestamp($5))
+           RETURNING *`,
+          [contact.id, messageBody, mediaUrl, wamid, timestamp]
+        );
 
-              if (existing.rows.length === 0) {
-                console.log(`⚠️ No message found for wamid ${metaMessageId} (status: ${newStatus})`);
-                continue;
-              }
+        const savedMessage = msgResult.rows[0];
 
-              const currentStatus = existing.rows[0].status;
-              const currentPriority = STATUS_PRIORITY[currentStatus] ?? -1;
-              const newPriority = STATUS_PRIORITY[newStatus] ?? -1;
+        
+        const io = req.app.get("io");
+        if (io) {
+          io.emit("new_message", {
+            id: savedMessage.id,
+            contact_id: contact.id,
+            contact_phone: contact.phone_number,
+            contact_name: contact.name,
+            direction: "inbound",
+            message_body: messageBody,
+            media_url: mediaUrl,
+            meta_message_id: wamid,
+            status: "delivered",
+            timestamp: savedMessage.timestamp,
+          });
+        }
 
-              // Special case: "failed" always overrides
-              if (newStatus !== "failed" && newPriority <= currentPriority) {
-                console.log(`ℹ️ Skipping status downgrade: ${currentStatus} → ${newStatus} for ${metaMessageId}`);
-                continue;
-              }
+        console.log(`📥 Inbound message from ${from}: "${messageBody.substring(0, 50)}"`);
+      }
+    }
 
-              await db.query(
-                `UPDATE messages SET status = $1 WHERE meta_message_id = $2`,
-                [newStatus, metaMessageId]
-              );
+    
+    if (value.statuses && value.statuses.length > 0) {
+      for (const status of value.statuses) {
+        const metaMessageId = status.id;
+        const newStatus = status.status; 
 
-              console.log(`📊 Status updated: ${currentStatus} → ${newStatus} for ${recipientId} (${metaMessageId})`);
+        if (["sent", "delivered", "read", "failed"].includes(newStatus)) {
+          await db.query(
+            `UPDATE messages SET status = $1 WHERE meta_message_id = $2`,
+            [newStatus, metaMessageId]
+          );
 
-              // Emit via Socket.IO for real-time tick updates
-              const io = req.app.get("io");
-              if (io) {
-                io.emit("message_status", {
-                  meta_message_id: metaMessageId,
-                  status: newStatus,
-                  recipient: recipientId,
-                });
-              }
-            } catch (statusErr) {
-              console.error("❌ Error processing individual status update:", statusErr);
-            }
+          
+          const io = req.app.get("io");
+          if (io) {
+            io.emit("message_status", {
+              meta_message_id: metaMessageId,
+              status: newStatus,
+              recipient: status.recipient_id,
+            });
           }
         }
       }
@@ -233,6 +182,5 @@ router.post("/", async (req, res) => {
     console.error("❌ Webhook processing error:", err);
   }
 });
-
 
 module.exports = router;

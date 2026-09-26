@@ -6,18 +6,9 @@ const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 
 const sendTemplateMessage = async (to, templateName, languageCode = "en_US", components = []) => {
   try {
-    // Sanitize phone number - remove +, spaces, dashes, etc.
-    const sanitizedTo = to ? to.replace(/\D/g, '') : "";
-    if (!sanitizedTo) {
-      console.error(`❌ Invalid phone number: "${to}"`);
-      return { success: false, error: `Invalid phone number: "${to}"` };
-    }
-
-    console.log(`📤 Sending template "${templateName}" to ${sanitizedTo}`);
-
     const payload = {
       messaging_product: "whatsapp",
-      to: sanitizedTo,
+      to,
       type: "template",
       template: {
         name: templateName,
@@ -40,14 +31,13 @@ const sendTemplateMessage = async (to, templateName, languageCode = "en_US", com
       }
     );
 
-    console.log(`✅ Message sent to ${sanitizedTo}, ID: ${response.data.messages?.[0]?.id}`);
     return {
       success: true,
       messageId: response.data.messages?.[0]?.id || null,
       data: response.data,
     };
   } catch (err) {
-    console.error(`❌ Meta API sendTemplate error for ${to}:`, err.response?.data || err.message);
+    console.error("❌ Meta API sendTemplate error:", err.response?.data || err.message);
     return {
       success: false,
       error: err.response?.data?.error?.message || err.message,
