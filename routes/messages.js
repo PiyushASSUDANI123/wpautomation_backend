@@ -90,6 +90,28 @@ router.get("/:contactId", async (req, res) => {
   }
 });
 
+// Mark messages as read for a contact
+router.put("/:contactId/read", async (req, res) => {
+  try {
+    const { contactId } = req.params;
+    
+    // Update all inbound messages for this contact to 'read'
+    const result = await db.query(
+      `UPDATE messages 
+       SET status = 'read' 
+       WHERE contact_id = $1 AND direction = 'inbound' AND status != 'read'
+       RETURNING id`,
+      [contactId]
+    );
+    
+    res.json({ success: true, updated_count: result.rowCount });
+  } catch (err) {
+    console.error("❌ Mark as read error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 
 
