@@ -89,6 +89,41 @@ const sendTextMessage = async (to, text) => {
   }
 };
 
+const sendMediaMessage = async (to, mediaUrl, type = "image") => {
+  try {
+    const sanitizedTo = to ? to.replace(/\D/g, '') : "";
+    const payload = {
+      messaging_product: "whatsapp",
+      to: sanitizedTo,
+      type,
+      [type]: { link: mediaUrl },
+    };
+
+    const response = await axios.post(
+      `${META_API_BASE}/${PHONE_NUMBER_ID}/messages`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return {
+      success: true,
+      messageId: response.data.messages?.[0]?.id || null,
+      data: response.data,
+    };
+  } catch (err) {
+    console.error("❌ Meta API sendMedia error:", err.response?.data || err.message);
+    return {
+      success: false,
+      error: err.response?.data?.error?.message || err.message,
+    };
+  }
+};
+
 const fs = require("fs");
 const FormData = require("form-data");
 
@@ -242,4 +277,12 @@ const createTemplate = async (name, language, category, text, headerType = "NONE
   }
 };
 
-module.exports = { sendTemplateMessage, sendTextMessage, uploadMediaToMeta, downloadMediaFromMeta, getTemplates, createTemplate };
+module.exports = { 
+  sendTemplateMessage, 
+  sendTextMessage, 
+  uploadMediaToMeta, 
+  downloadMediaFromMeta, 
+  getTemplates, 
+  createTemplate,
+  sendMediaMessage,
+};

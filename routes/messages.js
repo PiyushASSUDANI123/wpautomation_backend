@@ -1,7 +1,20 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const { sendTextMessage, sendTemplateMessage } = require("../services/metaApi");
+const { sendTextMessage, sendTemplateMessage, sendMediaMessage } = require("../services/metaApi");
+const { uploadFileToCloudinary } = require("../services/cloudinaryService");
+const multer = require("multer");
+const os = require("os");
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+    },
+  }),
+  limits: { fileSize: 16 * 1024 * 1024 }, 
+});
 
 
 
@@ -235,3 +248,85 @@ router.post("/:contactId/template", async (req, res) => {
 });
 
 module.exports = router;
+
+router.post("/:contactId/media", upload.single("file"), async (req, res) => {
+  try {
+    const { contactId } = req.params;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file provided" });
+    }
+
+    const contactResult = await db.query(`SELECT * FROM contacts WHERE id = $1`, [contactId]);
+    if (contactResult.rows.length === 0) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+    const contact = contactResult.rows[0];
+
+    // Check 24 hour window
+    const lastInbound = await db.query(
+      `SELECT timestamp FROM messages
+       WHERE contact_id = $1 AND direction = 'inbound'
+       ORDER BY timestamp DESC LIMIT 1`,
+      [contactId]
+    );
+
+    if (!lastInbound.rows[0]) {
+      return res.status(403).json({ error: "No inbound messages from this contact.", window_closed: true });
+    }
+
+    const hoursSinceLastInbound = (new Date() - new Date(lastInbound.rows[0].timestamp)) / (1000 * 60 * 60);
+    if (hoursSinceLastInbound > 24) {
+      return res.status(403).json({ error: "24-hour window closed.", window_closed: true });
+    }
+
+    // Determine type
+    let resourceType = "auto";
+    let metaType = "image";
+    if (req.file.mimetype.startsWith("image/")) { resourceType = "image"; metaType = "image"; }
+    else if (req.file.mimetype.startsWith("video/")) { resourceType = "video"; metaType = "video"; }
+    else if (req.file.mimetype.startsWith("audio/")) { resourceType = "video"; metaType = "audio"; }
+    else { resourceType = "raw"; metaType = "document"; }
+
+    // Upload to Cloudinary
+    const mediaUrl = await uploadFileToCloudinary(req.file.path, "wp_automation/direct", resourceType);
+
+    // Send via Meta API using the URL
+    const result = await sendMediaMessage(contact.phone_number, mediaUrl, metaType);
+
+    if (!result.success) {
+      return res.status(502).json({ error: "Failed to send media via Meta API", details: result.error });
+    }
+
+    // Save to database
+    const msgResult = await db.query(
+      `INSERT INTO messages (contact_id, direction, message_body, media_url, meta_message_id, status, timestamp)
+       VALUES ($1, 'outbound', '[Media]', $2, $3, 'sent', NOW()) RETURNING *`,
+      [contactId, mediaUrl, result.messageId]
+    );
+
+    const savedMessage = msgResult.rows[0];
+
+    // Emit via Socket
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("new_message", {
+        id: savedMessage.id,
+        contact_id: parseInt(contactId),
+        contact_phone: contact.phone_number,
+        contact_name: contact.name,
+        direction: "outbound",
+        message_body: "[Media]",
+        media_url: mediaUrl,
+        meta_message_id: result.messageId,
+        status: "sent",
+        timestamp: savedMessage.timestamp,
+      });
+    }
+
+    res.status(201).json(savedMessage);
+  } catch (err) {
+    console.error("❌ Send media error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
