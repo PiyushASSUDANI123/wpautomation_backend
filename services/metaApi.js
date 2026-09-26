@@ -277,6 +277,23 @@ const createTemplate = async (name, language, category, text, headerType = "NONE
   }
 };
 
+const getAccountHealth = async () => {
+  try {
+    const response = await axios.get(
+      `${META_API_BASE}/${PHONE_NUMBER_ID}?fields=display_phone_number,name_status,quality_rating,messaging_limit_tier,status`,
+      {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+        },
+      }
+    );
+    return { success: true, data: response.data };
+  } catch (err) {
+    console.error("❌ Meta API getAccountHealth error:", err.response?.data || err.message);
+    return { success: false, error: err.response?.data?.error?.message || err.message };
+  }
+};
+
 module.exports = { 
   sendTemplateMessage, 
   sendTextMessage, 
@@ -285,4 +302,5 @@ module.exports = {
   getTemplates, 
   createTemplate,
   sendMediaMessage,
+  getAccountHealth,
 };

@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 
+const { getAccountHealth } = require("../services/metaApi");
+
 router.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -10,12 +12,18 @@ router.get("/health", (req, res) => {
   });
 });
 
-
-router.get("/data", (req, res) => {
-  res.json({
-    message: "Sample data from backend",
-    data: [],
-  });
+router.get("/account-health", async (req, res) => {
+  try {
+    const result = await getAccountHealth();
+    if (result.success) {
+      res.json(result.data);
+    } else {
+      res.status(500).json({ error: result.error });
+    }
+  } catch (err) {
+    console.error("❌ Account health route error:", err);
+    res.status(500).json({ error: "Failed to fetch account health" });
+  }
 });
 
 module.exports = router;
