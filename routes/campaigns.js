@@ -146,8 +146,10 @@ router.post("/", uploadMedia.single("mediaFile"), async (req, res) => {
         bodyParams.push({ type: "text", text: "Update" }); // Generic fallback for extra params
       }
 
+      const sanitizedPhone = member.phone_number ? member.phone_number.replace(/\D/g, '') : "";
+      
       return {
-        to: member.phone_number,
+        to: sanitizedPhone,
         contactId: member.id,
         bodyParams
       };

@@ -137,6 +137,33 @@ router.post("/", upload.single("file"), async (req, res) => {
 });
 
 
+router.post("/manual", express.json(), async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "List name is required" });
+    }
+    
+    const listResult = await db.query(
+      `INSERT INTO contact_lists (name) VALUES ($1) RETURNING *`,
+      [name]
+    );
+    
+    res.status(201).json({
+      message: "Empty contact list created successfully",
+      list: {
+        id: listResult.rows[0].id,
+        name: listResult.rows[0].name,
+        member_count: 0,
+        created_at: listResult.rows[0].created_at,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Manual list creation error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/:id/contacts", async (req, res) => {
   try {
     const { id } = req.params;
