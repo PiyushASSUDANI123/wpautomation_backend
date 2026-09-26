@@ -22,7 +22,15 @@ router.get("/", async (req, res) => {
           WHERE m2.contact_id = c.id
             AND m2.direction = 'inbound'
             AND m2.status != 'read'
-        ) as unread_count
+        ) as unread_count,
+        (
+          SELECT timestamp
+          FROM messages m3
+          WHERE m3.contact_id = c.id
+            AND m3.direction = 'inbound'
+          ORDER BY timestamp DESC
+          LIMIT 1
+        ) as last_inbound_time
       FROM contacts c
       LEFT JOIN LATERAL (
         SELECT message_body, direction, timestamp
