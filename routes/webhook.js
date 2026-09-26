@@ -206,12 +206,18 @@ router.post("/", async (req, res) => {
                 continue;
               }
 
+              // Extract error message if failed
+              let errorMsg = null;
+              if (newStatus === "failed" && status.errors && status.errors.length > 0) {
+                errorMsg = status.errors[0].message || status.errors[0].title || "Unknown error";
+              }
+
               await db.query(
-                `UPDATE messages SET status = $1 WHERE meta_message_id = $2`,
-                [newStatus, metaMessageId]
+                `UPDATE messages SET status = $1, error_message = COALESCE($3, error_message) WHERE meta_message_id = $2`,
+                [newStatus, metaMessageId, errorMsg]
               );
 
-              console.log(`📊 Status updated: ${currentStatus} → ${newStatus} for ${recipientId} (${metaMessageId})`);
+              console.log(`📊 Status updated: ${currentStatus} → ${newStatus} for ${recipientId} (${metaMessageId})${errorMsg ? ` [${errorMsg}]` : ''}`);
 
               // Emit via Socket.IO for real-time tick updates
               const io = req.app.get("io");

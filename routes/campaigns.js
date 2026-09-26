@@ -260,7 +260,7 @@ router.get("/:id/recipients", async (req, res) => {
   try {
     const { id } = req.params;
     const result = await db.query(
-      `SELECT m.id, c.phone_number, c.name, m.status, m.timestamp
+      `SELECT m.id, c.phone_number, c.name, m.status, m.timestamp, m.error_message
        FROM messages m
        JOIN contacts c ON m.contact_id = c.id
        WHERE m.campaign_id = $1
