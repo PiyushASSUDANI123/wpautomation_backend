@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
           FROM messages m2
           WHERE m2.contact_id = c.id
             AND m2.direction = 'inbound'
-            AND m2.status != 'read'
+            AND m2.status IS DISTINCT FROM 'read'
         ) as unread_count,
         (
           SELECT timestamp
