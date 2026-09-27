@@ -54,7 +54,7 @@ router.get("/:contactId", async (req, res) => {
     const messagesResult = await db.query(
       `SELECT * FROM messages
        WHERE contact_id = $1
-       ORDER BY timestamp ASC
+       ORDER BY timestamp ASC NULLS FIRST, id ASC
        LIMIT $2 OFFSET $3`,
       [contactId, parseInt(limit), parseInt(offset)]
     );
@@ -272,14 +272,20 @@ router.post("/:contactId/template", async (req, res) => {
 router.delete("/:messageId", async (req, res) => {
   try {
     const { messageId } = req.params;
-    await db.query("DELETE FROM messages WHERE id = $1", [messageId]);
+    const result = await db.query(
+      "DELETE FROM messages WHERE id = $1 RETURNING id",
+      [messageId]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Message not found" });
+    }
     
     const io = req.app.get("io");
     if (io) {
-      io.emit("message_deleted", { id: parseInt(messageId) });
+      io.emit("message_deleted", { id: result.rows[0].id });
     }
     
-    res.json({ success: true });
+    res.json({ success: true, id: result.rows[0].id });
   } catch (err) {
     console.error("❌ Delete message error:", err);
     res.status(500).json({ error: err.message });
