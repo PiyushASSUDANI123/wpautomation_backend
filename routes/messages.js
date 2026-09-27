@@ -269,6 +269,23 @@ router.post("/:contactId/template", async (req, res) => {
   }
 });
 
+router.delete("/:messageId", async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    await db.query("DELETE FROM messages WHERE id = $1", [messageId]);
+    
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("message_deleted", { id: parseInt(messageId) });
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ Delete message error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
 
 router.post("/:contactId/media", upload.single("file"), async (req, res) => {
