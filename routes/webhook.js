@@ -62,7 +62,17 @@ router.post("/", async (req, res) => {
             try {
               const from = message.from;
               const wamid = message.id;
-              const timestamp = message.timestamp;
+              const suppliedTimestamp = Number(message.timestamp);
+              const timestamp =
+                Number.isFinite(suppliedTimestamp) && suppliedTimestamp > 0
+                  ? suppliedTimestamp >= 1e12
+                    ? suppliedTimestamp / 1000
+                    : suppliedTimestamp
+                  : Date.now() / 1000;
+
+              if (!Number.isFinite(suppliedTimestamp) || suppliedTimestamp <= 0) {
+                console.warn(`⚠️ Invalid inbound timestamp for ${wamid}; using webhook receive time`);
+              }
 
               let messageBody = "";
               let mediaUrl = null;

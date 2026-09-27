@@ -28,7 +28,8 @@ router.get("/", async (req, res) => {
           FROM messages m3
           WHERE m3.contact_id = c.id
             AND m3.direction = 'inbound'
-          ORDER BY timestamp DESC
+            AND m3.timestamp IS NOT NULL
+          ORDER BY m3.timestamp DESC
           LIMIT 1
         ) as last_inbound_time
       FROM contacts c
@@ -36,7 +37,7 @@ router.get("/", async (req, res) => {
         SELECT message_body, direction, timestamp
         FROM messages
         WHERE contact_id = c.id
-        ORDER BY timestamp DESC
+        ORDER BY timestamp DESC NULLS LAST
         LIMIT 1
       ) m ON true
       ORDER BY m.timestamp DESC NULLS LAST`
@@ -63,17 +64,17 @@ router.get("/:id", async (req, res) => {
     
     const lastInbound = await db.query(
       `SELECT timestamp FROM messages
-       WHERE contact_id = $1 AND direction = 'inbound'
-       ORDER BY timestamp DESC
+       WHERE contact_id = $1 AND direction = 'inbound' AND timestamp IS NOT NULL
+       ORDER BY timestamp DESC NULLS LAST
        LIMIT 1`,
       [id]
     );
 
     const contact = result.rows[0];
     contact.last_inbound_at = lastInbound.rows[0]?.timestamp || null;
-    contact.window_open =
-      lastInbound.rows[0]?.timestamp &&
-      new Date() - new Date(lastInbound.rows[0].timestamp) < 24 * 60 * 60 * 1000;
+    contact.window_open = lastInbound.rows[0]?.timestamp
+      ? Date.now() - new Date(lastInbound.rows[0].timestamp).getTime() < 24 * 60 * 60 * 1000
+      : false;
 
     res.json(contact);
   } catch (err) {

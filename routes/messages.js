@@ -62,8 +62,8 @@ router.get("/:contactId", async (req, res) => {
     
     const lastInbound = await db.query(
       `SELECT timestamp FROM messages
-       WHERE contact_id = $1 AND direction = 'inbound'
-       ORDER BY timestamp DESC
+       WHERE contact_id = $1 AND direction = 'inbound' AND timestamp IS NOT NULL
+       ORDER BY timestamp DESC NULLS LAST
        LIMIT 1`,
       [contactId]
     );
@@ -134,8 +134,8 @@ router.post("/:contactId", async (req, res) => {
     
     const lastInbound = await db.query(
       `SELECT timestamp FROM messages
-       WHERE contact_id = $1 AND direction = 'inbound'
-       ORDER BY timestamp DESC
+       WHERE contact_id = $1 AND direction = 'inbound' AND timestamp IS NOT NULL
+       ORDER BY timestamp DESC NULLS LAST
        LIMIT 1`,
       [contactId]
     );
@@ -150,7 +150,7 @@ router.post("/:contactId", async (req, res) => {
     const lastInboundTime = new Date(lastInbound.rows[0].timestamp);
     const hoursSinceLastInbound = (new Date() - lastInboundTime) / (1000 * 60 * 60);
 
-    if (hoursSinceLastInbound > 24) {
+    if (hoursSinceLastInbound >= 24) {
       return res.status(403).json({
         error: "24-hour window closed. Send a template to restart chat.",
         window_closed: true,
@@ -305,8 +305,8 @@ router.post("/:contactId/media", upload.single("file"), async (req, res) => {
     // Check 24 hour window
     const lastInbound = await db.query(
       `SELECT timestamp FROM messages
-       WHERE contact_id = $1 AND direction = 'inbound'
-       ORDER BY timestamp DESC LIMIT 1`,
+       WHERE contact_id = $1 AND direction = 'inbound' AND timestamp IS NOT NULL
+       ORDER BY timestamp DESC NULLS LAST LIMIT 1`,
       [contactId]
     );
 
@@ -315,7 +315,7 @@ router.post("/:contactId/media", upload.single("file"), async (req, res) => {
     }
 
     const hoursSinceLastInbound = (new Date() - new Date(lastInbound.rows[0].timestamp)) / (1000 * 60 * 60);
-    if (hoursSinceLastInbound > 24) {
+    if (hoursSinceLastInbound >= 24) {
       return res.status(403).json({ error: "24-hour window closed.", window_closed: true });
     }
 
