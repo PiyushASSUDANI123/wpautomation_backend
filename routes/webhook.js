@@ -111,6 +111,8 @@ router.post("/", async (req, res) => {
                 } else {
                   messageBody = "[Interactive Response]";
                 }
+              } else if (message.type === "reaction") {
+                messageBody = message.reaction?.emoji || "👍";
               } else {
                 messageBody = `[${message.type || "Unknown"}]`;
               }
