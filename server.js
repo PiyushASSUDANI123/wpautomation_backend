@@ -70,6 +70,7 @@ const authRoutes = require("./routes/auth");
 const contactListsRoutes = require("./routes/contact_lists");
 const templateRoutes = require("./routes/templates");
 const mediaRoutes = require("./routes/media");
+const dashboardRoutes = require("./routes/dashboard");
 
 app.use("/api", apiRoutes);
 app.use("/api/auth", authRoutes);
@@ -79,6 +80,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/media", mediaRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/webhook", webhookRoutes);
 
 
