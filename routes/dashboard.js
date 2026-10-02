@@ -4,7 +4,20 @@ const db = require("../db");
 
 router.get("/", async (req, res) => {
   try {
-    // 1. Total Contacts
+    const { startDate, endDate } = req.query;
+    
+    // We can filter campaigns and messages by date if provided
+    let campaignWhere = "";
+    let messageWhere = "";
+    const params = [];
+    
+    if (startDate && endDate) {
+      campaignWhere = "WHERE DATE(created_at) >= $1 AND DATE(created_at) <= $2";
+      messageWhere = "WHERE DATE(timestamp) >= $1 AND DATE(timestamp) <= $2";
+      params.push(startDate, endDate);
+    }
+
+    // 1. Total Contacts (usually all-time, but keeping it simple)
     const contactsRes = await db.query("SELECT COUNT(*) FROM contacts");
     const totalLeads = parseInt(contactsRes.rows[0].count, 10);
 
@@ -16,18 +29,16 @@ router.get("/", async (req, res) => {
     const campaignsRes = await db.query(`
       SELECT 
         COUNT(*) as total_campaigns,
-        COALESCE(SUM(total_sent), 0) as total_sent,
-        COALESCE(SUM(total_delivered), 0) as total_delivered,
-        COALESCE(SUM(total_read), 0) as total_read,
-        COALESCE(SUM(total_failed), 0) as total_failed
+        COALESCE(SUM(total_sent), 0) as total_sent
       FROM campaigns
-    `);
+      ${campaignWhere}
+    `, params);
     const c = campaignsRes.rows[0];
     const totalCampaigns = parseInt(c.total_campaigns, 10);
     let campaignsSent = parseInt(c.total_sent, 10);
-    let campaignsDelivered = parseInt(c.total_delivered, 10);
-    let campaignsRead = parseInt(c.total_read, 10);
-    let campaignsFailed = parseInt(c.total_failed, 10);
+    let campaignsDelivered = 0;
+    let campaignsRead = 0;
+    let campaignsFailed = 0;
 
     // 4. Message counts from messages table for more accurate stats (including non-campaign messages)
     const msgsRes = await db.query(`
@@ -36,8 +47,9 @@ router.get("/", async (req, res) => {
         status,
         COUNT(*) as count
       FROM messages
+      ${messageWhere}
       GROUP BY direction, status
-    `);
+    `, params);
     
     let totalMessagesSent = 0;
     let totalMessagesReceived = 0;

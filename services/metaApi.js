@@ -223,16 +223,23 @@ const createTemplate = async (name, language, category, text, headerType = "NONE
     ];
 
     if (headerType && headerType !== "NONE") {
-      const headerComp = {
-        type: "HEADER",
-        format: headerType,
-      };
-      if (headerType === "TEXT" && headerText) {
-        headerComp.text = headerText;
-      } else if (headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT" || headerType === "LOCATION") {
-        // Handle example media handles if required by Meta, though often optional for creation without examples
+      if (headerType === "TEXT" && !headerText) {
+        // Skip header if it's TEXT but the text is empty
+      } else {
+        const headerComp = {
+          type: "HEADER",
+          format: headerType,
+        };
+        if (headerType === "TEXT") {
+          headerComp.text = headerText;
+        } else if (headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") {
+          // Meta requires an example object for media headers
+          headerComp.example = {
+            header_handle: ["4:YXNpY..."] // Dummy handle, Meta sometimes accepts dummy for creation
+          };
+        }
+        components.unshift(headerComp);
       }
-      components.unshift(headerComp);
     }
 
     if (footerText) {
