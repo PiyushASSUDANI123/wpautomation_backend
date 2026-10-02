@@ -328,10 +328,25 @@ router.post("/:contactId/media", upload.single("file"), async (req, res) => {
     // Determine type
     let resourceType = "auto";
     let metaType = "image";
-    if (req.file.mimetype.startsWith("image/")) { resourceType = "image"; metaType = "image"; }
-    else if (req.file.mimetype.startsWith("video/")) { resourceType = "video"; metaType = "video"; }
-    else if (req.file.mimetype.startsWith("audio/")) { resourceType = "video"; metaType = "audio"; }
-    else { resourceType = "raw"; metaType = "document"; }
+    let displayBody = "[Image]";
+    
+    if (req.file.mimetype.startsWith("image/")) { 
+      resourceType = "image"; 
+      metaType = "image"; 
+      displayBody = "[Image]";
+    } else if (req.file.mimetype.startsWith("video/")) { 
+      resourceType = "video"; 
+      metaType = "video"; 
+      displayBody = "[Video]";
+    } else if (req.file.mimetype.startsWith("audio/")) { 
+      resourceType = "video"; 
+      metaType = "audio"; 
+      displayBody = "[Audio]";
+    } else { 
+      resourceType = "raw"; 
+      metaType = "document"; 
+      displayBody = "[Document]";
+    }
 
     // Upload to Cloudinary
     const mediaUrl = await uploadFileToCloudinary(req.file.path, "wp_automation/direct", resourceType);
@@ -346,8 +361,8 @@ router.post("/:contactId/media", upload.single("file"), async (req, res) => {
     // Save to database
     const msgResult = await db.query(
       `INSERT INTO messages (contact_id, direction, message_body, media_url, meta_message_id, status, timestamp)
-       VALUES ($1, 'outbound', '[Media]', $2, $3, 'sent', NOW()) RETURNING *`,
-      [contactId, mediaUrl, result.messageId]
+       VALUES ($1, 'outbound', $2, $3, $4, 'sent', NOW()) RETURNING *`,
+      [contactId, displayBody, mediaUrl, result.messageId]
     );
 
     const savedMessage = msgResult.rows[0];
@@ -361,7 +376,7 @@ router.post("/:contactId/media", upload.single("file"), async (req, res) => {
         contact_phone: contact.phone_number,
         contact_name: contact.name,
         direction: "outbound",
-        message_body: "[Media]",
+        message_body: displayBody,
         media_url: mediaUrl,
         meta_message_id: result.messageId,
         status: "sent",
