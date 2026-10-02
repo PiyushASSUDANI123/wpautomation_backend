@@ -21,13 +21,13 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, language, category, text, headerType, buttons } = req.body;
+    const { name, language, category, text, headerType, headerText, footerText, buttons } = req.body;
     
     if (!name || !language || !category || !text) {
       return res.status(400).json({ error: "Missing required fields: name, language, category, text" });
     }
 
-    const result = await require("../services/metaApi").createTemplate(name, language, category, text, headerType, buttons);
+    const result = await require("../services/metaApi").createTemplate(name, language, category, text, headerType, headerText, footerText, buttons);
     res.json({ success: true, data: result });
   } catch (err) {
     console.error("❌ Create template error:", err);

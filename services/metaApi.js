@@ -213,7 +213,7 @@ const getTemplates = async () => {
     throw new Error(err.response?.data?.error?.message || err.message);
   }
 };
-const createTemplate = async (name, language, category, text, headerType = "NONE", buttons = []) => {
+const createTemplate = async (name, language, category, text, headerType = "NONE", headerText = "", footerText = "", buttons = []) => {
   try {
     const components = [
       {
@@ -223,17 +223,23 @@ const createTemplate = async (name, language, category, text, headerType = "NONE
     ];
 
     if (headerType && headerType !== "NONE") {
-      
-      
-      let exampleHandle = "";
-      if (headerType === "IMAGE") exampleHandle = "4:YXNpY... (dummy example)"; 
-      
       const headerComp = {
         type: "HEADER",
         format: headerType,
       };
-      
+      if (headerType === "TEXT" && headerText) {
+        headerComp.text = headerText;
+      } else if (headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT" || headerType === "LOCATION") {
+        // Handle example media handles if required by Meta, though often optional for creation without examples
+      }
       components.unshift(headerComp);
+    }
+
+    if (footerText) {
+      components.push({
+        type: "FOOTER",
+        text: footerText,
+      });
     }
 
     if (buttons && buttons.length > 0) {
