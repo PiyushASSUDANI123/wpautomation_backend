@@ -168,7 +168,13 @@ router.get("/:id/contacts", async (req, res) => {
   try {
     const { id } = req.params;
     const result = await db.query(
-      `SELECT c.id, c.phone_number, c.name, c.city, c.created_at
+      `SELECT c.id, c.phone_number, c.name, c.city, c.created_at,
+        (SELECT EXISTS (
+          SELECT 1 FROM messages m 
+          WHERE m.contact_id = c.id 
+          AND m.status = 'failed' 
+          AND m.error_message ILIKE '%undeliverable%'
+        )) as not_on_wp
        FROM contact_list_members clm
        JOIN contacts c ON clm.contact_id = c.id
        WHERE clm.list_id = $1

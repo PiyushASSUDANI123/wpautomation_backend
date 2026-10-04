@@ -108,6 +108,38 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, phone_number, city } = req.body;
+    
+    if (!phone_number) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    const cleanedPhone = phone_number.replace(/\D/g, "");
+    
+    // Check if another contact has this phone number
+    const checkResult = await db.query("SELECT id FROM contacts WHERE phone_number = $1 AND id != $2", [cleanedPhone, id]);
+    if (checkResult.rows.length > 0) {
+      return res.status(400).json({ error: "Another contact with this phone number already exists" });
+    }
+
+    const result = await db.query(
+      "UPDATE contacts SET name = $1, phone_number = $2, city = $3 WHERE id = $4 RETURNING *",
+      [name || "Unknown", cleanedPhone, city || "", id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+
+    res.json({ message: "Contact updated successfully", contact: result.rows[0] });
+  } catch (err) {
+    console.error("❌ Update contact error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
