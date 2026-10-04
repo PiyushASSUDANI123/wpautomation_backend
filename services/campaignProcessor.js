@@ -105,8 +105,8 @@ const initBullMQ = (io) => {
       {
         connection,
         limiter: {
-          max: 50,
-          duration: 1000, 
+          max: 1,
+          duration: 2000, 
         },
       }
     );
@@ -129,8 +129,7 @@ const initBullMQ = (io) => {
 
 
 const processInMemory = async (messages, campaignId, templateName, languageCode, io, mediaId = null, mediaType = null) => {
-  const BATCH_SIZE = 50;
-  const DELAY_MS = 1000; 
+  const DELAY_MS = 2000; 
 
   let components = [];
   if (mediaId && mediaType) {
@@ -145,18 +144,18 @@ const processInMemory = async (messages, campaignId, templateName, languageCode,
     });
   }
 
-  for (let i = 0; i < messages.length; i += BATCH_SIZE) {
-    const batch = messages.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < messages.length; i++) {
+    const { to, contactId, bodyParams } = messages[i];
+    
+    let messageComponents = [...components];
+    if (bodyParams && bodyParams.length > 0) {
+      messageComponents.push({
+        type: "body",
+        parameters: bodyParams
+      });
+    }
 
-    const promises = batch.map(async ({ to, contactId, bodyParams }) => {
-      let messageComponents = [...components];
-      if (bodyParams && bodyParams.length > 0) {
-        messageComponents.push({
-          type: "body",
-          parameters: bodyParams
-        });
-      }
-
+    try {
       const result = await sendTemplateMessage(to, templateName, languageCode, messageComponents);
 
       await db.query(
@@ -186,14 +185,12 @@ const processInMemory = async (messages, campaignId, templateName, languageCode,
           error: result.error || null,
         });
       }
-
-      return result;
-    });
-
-    await Promise.allSettled(promises);
+    } catch (error) {
+      console.error(`Error sending message to ${to}:`, error);
+    }
 
     
-    if (i + BATCH_SIZE < messages.length) {
+    if (i < messages.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
     }
   }
